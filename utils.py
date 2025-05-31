@@ -51,17 +51,83 @@ def save_results(results: Dict, output_path: Union[str, Path]):
     serializable_results = {}
     for key, value in results.items():
         if isinstance(value, pd.DataFrame):
+            # Convert DataFrame with proper handling of datetime index
+            if isinstance(value.index, pd.DatetimeIndex):
+                index_list = [str(dt) for dt in value.index]  # Convert timestamps to strings
+            else:
+                index_list = value.index.tolist()
+            
+            # Convert to dict and handle timestamp keys in data
+            data_dict = {}
+            for col in value.columns:
+                col_data = {}
+                for idx, val in value[col].items():
+                    # Convert timestamp index to string for JSON compatibility
+                    key_str = str(idx) if isinstance(idx, pd.Timestamp) else idx
+                    col_data[key_str] = val
+                data_dict[col] = col_data
+            
             serializable_results[key] = {
-                'data': value.to_dict(),
-                'index': value.index.tolist()
+                'data': data_dict,
+                'index': index_list,
+                'columns': value.columns.tolist()
             }
         elif isinstance(value, pd.Series):
-            serializable_results[key] = value.to_dict()
+            # Handle Series with timestamp index
+            series_dict = {}
+            for idx, val in value.items():
+                key_str = str(idx) if isinstance(idx, pd.Timestamp) else idx
+                series_dict[key_str] = val
+            serializable_results[key] = series_dict
+        elif isinstance(value, list):
+            # Handle list of dictionaries that might contain timestamps
+            clean_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    clean_item = {}
+                    for k, v in item.items():
+                        # Convert timestamp values to strings
+                        if isinstance(v, pd.Timestamp):
+                            clean_item[k] = str(v)
+                        else:
+                            clean_item[k] = v
+                    clean_list.append(clean_item)
+                else:
+                    clean_list.append(item)
+            serializable_results[key] = clean_list
         else:
-            serializable_results[key] = value
+            # Handle other types
+            if isinstance(value, pd.Timestamp):
+                serializable_results[key] = str(value)
+            else:
+                serializable_results[key] = value
     
-    with open(output_path, 'w') as f:
-        json.dump(serializable_results, f, indent=2, default=str)
+    # Custom JSON encoder for remaining edge cases
+    def json_serializer(obj):
+        if isinstance(obj, pd.Timestamp):
+            return str(obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif pd.isna(obj):
+            return None
+        return str(obj)
+    
+    try:
+        with open(output_path, 'w') as f:
+            json.dump(serializable_results, f, indent=2, default=json_serializer)
+        logger.info(f"Results saved to {output_path}")
+    except Exception as e:
+        logger.error(f"Failed to save results: {e}")
+        # Fallback: save as pickle
+        pickle_path = output_path.with_suffix('.pkl')
+        import pickle
+        with open(pickle_path, 'wb') as f:
+            pickle.dump(results, f)
+        logger.info(f"Results saved as pickle to {pickle_path}")
 
 def plot_backtest_results(results: Dict, save_path: Optional[Union[str, Path]] = None):
     """Create visualization of backtest results"""
@@ -123,6 +189,7 @@ def plot_backtest_results(results: Dict, save_path: Optional[Union[str, Path]] =
     
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        logger.info(f"Plot saved to {save_path}")
     
     return fig
 
@@ -200,25 +267,28 @@ def export_to_excel(results: Dict, output_path: Union[str, Path]):
     """Export results to Excel with multiple sheets"""
     output_path = Path(output_path)
     
-    with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
-        # Portfolio values
-        results['portfolio_values'].to_excel(writer, sheet_name='Portfolio Values')
+    try:
+        with pd.ExcelWriter(output_path, engine='xlsxwriter') as writer:
+            # Portfolio values
+            results['portfolio_values'].to_excel(writer, sheet_name='Portfolio Values')
+            
+            # Metrics
+            metrics_df = pd.DataFrame([results['metrics']])
+            metrics_df.to_excel(writer, sheet_name='Metrics', index=False)
+            
+            # Transactions
+            if 'transactions' in results and results['transactions']:
+                transactions_df = pd.DataFrame(results['transactions'])
+                transactions_df.to_excel(writer, sheet_name='Transactions', index=False)
+            
+            # Weights history
+            if 'weights_history' in results and results['weights_history']:
+                weights_df = pd.DataFrame(results['weights_history'])
+                weights_df.to_excel(writer, sheet_name='Weights History', index=False)
         
-        # Metrics
-        metrics_df = pd.DataFrame([results['metrics']])
-        metrics_df.to_excel(writer, sheet_name='Metrics', index=False)
-        
-        # Transactions
-        if 'transactions' in results and results['transactions']:
-            transactions_df = pd.DataFrame(results['transactions'])
-            transactions_df.to_excel(writer, sheet_name='Transactions', index=False)
-        
-        # Weights history
-        if 'weights_history' in results and results['weights_history']:
-            weights_df = pd.DataFrame(results['weights_history'])
-            weights_df.to_excel(writer, sheet_name='Weights History', index=False)
-    
-    logger.info(f"Results exported to {output_path}")
+        logger.info(f"Results exported to {output_path}")
+    except Exception as e:
+        logger.error(f"Failed to export to Excel: {e}")
 
 def format_number(value: float, format_type: str = 'general') -> str:
     """Format numbers for display"""
