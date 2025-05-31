@@ -1,0 +1,75 @@
+# config.yaml - Sample configuration file
+
+# Data fetching configuration
+data:
+  cache_dir: "./data_cache"
+  use_cache: true
+  cache_expiry_hours: 24
+  batch_size: 10
+  adjust_prices: true
+
+# Factor calculation configuration  
+factors:
+  momentum_windows: [21, 63, 126, 252]
+  volatility_windows: [30, 90]
+  zscore_window: 252
+  winsorize_sigma: 3.0
+  min_data_points: 252
+
+# Factor weights (can be learned from data or set manually)
+weights:
+  momentum:
+    1m: 0.1
+    3m: 0.3
+    6m: 0.4
+    12m: 0.2
+  value:
+    pe_ratio: 0.3
+    pb_ratio: 0.2
+    ps_ratio: 0.2
+    peg_ratio: 0.2
+    ev_ebitda: 0.1
+  quality:
+    roe: 0.3
+    roa: 0.2
+    profit_margin: 0.2
+    current_ratio: 0.15
+    debt_to_equity: 0.15
+  growth:
+    revenue_growth: 0.5
+    earnings_growth: 0.5
+  technical:
+    rsi: 0.2
+    price_to_sma20: 0.3
+    price_to_sma50: 0.3
+    volatility: 0.2
+  composite:
+    value: 0.25
+    momentum: 0.20
+    quality: 0.25
+    growth: 0.15
+    technical: 0.15
+
+# Backtesting configuration
+backtest:
+  initial_capital: 1000000
+  rebalance_frequency: "monthly"  # daily, weekly, monthly, quarterly
+  transaction_cost: 0.001  # 10 bps
+  slippage: 0.0005  # 5 bps
+  max_position_size: 0.10  # 10% max per position
+  min_position_size: 0.02  # 2% min per position
+  benchmark: "SPY"
+  # start_date: "2020-01-01"  # Optional
+  # end_date: "2023-12-31"    # Optional
+
+# Portfolio construction configuration
+portfolio:
+  optimization_method: "risk_parity"  # equal_weight, risk_parity, mean_variance, hierarchical_risk_parity
+  target_volatility: 0.15  # 15% annual volatility
+  max_sector_weight: 0.30  # 30% max in any sector
+  max_turnover: 0.50  # 50% monthly turnover limit
+  risk_free_rate: 0.04  # 4% annual risk-free rate
+
+# Logging
+log_level: "INFO"
+log_file: "factor_analyzer.log"
