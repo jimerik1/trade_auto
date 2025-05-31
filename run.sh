@@ -11,3 +11,4 @@ source venv/bin/activate
 # python main.py --config config.yaml
 
 python3 main.py
+#python3 main.py --weekly-signals

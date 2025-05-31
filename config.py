@@ -90,15 +90,36 @@ class PortfolioConfig:
     risk_free_rate: float = 0.04  # 4% annual risk-free rate
     max_position_size: float = 0.10  # 10% max per position
     min_position_size: float = 0.02  # 2% min per position
+
+@dataclass
+class ShortTermFactorConfig:
+    """Short-term factor configuration for weekly signals"""
+    momentum_windows: List[int] = field(default_factory=lambda: [5, 10])
+    volatility_windows: List[int] = field(default_factory=lambda: [5, 10])
+    zscore_window: int = 63          # three months
+    winsorize_sigma: float = 2.5
+    min_data_points: int = 63        # ~3 months
+
+@dataclass
+class SignalConfig:
+    """Weekly signal generation configuration"""
+    scan_day: str = "Monday"         # Which weekday to generate ideas
+    top_k: int = 10                  # number of buys
+    hold_period_days: int = 5        # exit after a week if no stop/target
+    stop_loss_pct: float = 0.04      # 4% trailing stop
+    take_profit_pct: float = 0.06    # 6% TP
+    position_size_pct: float = 0.05  # 5% of equity per name
     
 @dataclass
 class Config:
     """Master configuration"""
     data: DataConfig = field(default_factory=DataConfig)
     factors: FactorConfig = field(default_factory=FactorConfig)
+    short_factors: ShortTermFactorConfig = field(default_factory=ShortTermFactorConfig)
     weights: FactorWeights = field(default_factory=FactorWeights)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     portfolio: PortfolioConfig = field(default_factory=PortfolioConfig)
+    signals: SignalConfig = field(default_factory=SignalConfig)
     
     # Logging
     log_level: str = "INFO"
@@ -110,9 +131,11 @@ class Config:
         return cls(
             data=DataConfig(**config_dict.get('data', {})),
             factors=FactorConfig(**config_dict.get('factors', {})),
+            short_factors=ShortTermFactorConfig(**config_dict.get('short_factors', {})),
             weights=FactorWeights(**config_dict.get('weights', {})),
             backtest=BacktestConfig(**config_dict.get('backtest', {})),
             portfolio=PortfolioConfig(**config_dict.get('portfolio', {})),
+            signals=SignalConfig(**config_dict.get('signals', {})),
             log_level=config_dict.get('log_level', 'INFO'),
             log_file=config_dict.get('log_file', 'factor_analyzer.log')
         )
@@ -122,6 +145,7 @@ class Config:
         return {
             'data': self.data.__dict__,
             'factors': self.factors.__dict__,
+            'short_factors': self.short_factors.__dict__,
             'weights': {
                 'momentum': self.weights.momentum,
                 'value': self.weights.value,
@@ -132,6 +156,7 @@ class Config:
             },
             'backtest': self.backtest.__dict__,
             'portfolio': self.portfolio.__dict__,
+            'signals': self.signals.__dict__,
             'log_level': self.log_level,
             'log_file': self.log_file
         }

@@ -70,6 +70,23 @@ portfolio:
   max_turnover: 0.50  # 50% monthly turnover limit
   risk_free_rate: 0.04  # 4% annual risk-free rate
 
+# Short-term factor configuration
+short_factors:
+  momentum_windows: [5, 10]
+  volatility_windows: [5, 10]
+  zscore_window: 63      # three months
+  winsorize_sigma: 2.5
+  min_data_points: 63    # ~3 months
+
+# Weekly signal generation configuration
+signals:
+  scan_day: "Monday"         # Which weekday to generate ideas
+  top_k: 10                  # number of buys
+  hold_period_days: 5        # exit after a week if no stop/target
+  stop_loss_pct: 0.04        # 4% trailing stop
+  take_profit_pct: 0.06      # 6% TP
+  position_size_pct: 0.05    # 5% of equity per name
+
 # Logging
 log_level: "INFO"
 log_file: "factor_analyzer.log"

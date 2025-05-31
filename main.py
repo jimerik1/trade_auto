@@ -15,6 +15,7 @@ from data_fetcher import DataFetcher
 from factor_calculator import FactorCalculator
 from portfolio_optimizer import PortfolioOptimizer
 from backtester import Backtester
+from short_term_signal_generator import ShortTermSignalGenerator
 import utils
 from companies import TICKERS
 
@@ -32,6 +33,10 @@ class FactorAnalysisSystem:
         self.factor_calculator = FactorCalculator(config.factors, config.weights)
         self.portfolio_optimizer = PortfolioOptimizer(config.portfolio)
         self.backtester = Backtester(config.backtest)
+        
+        # Short-term components
+        self.short_factor_calc = FactorCalculator(config.short_factors, config.weights)
+        self.signal_generator = ShortTermSignalGenerator(self.short_factor_calc, config.signals)
         
     async def fetch_data(self, tickers: list) -> dict:
         """Fetch all required data"""
@@ -200,6 +205,7 @@ def main():
     parser.add_argument('--list', type=str, help='Ticker list name from companies.py')
     parser.add_argument('--backtest-only', action='store_true', help='Run backtest only')
     parser.add_argument('--export', type=str, help='Export format (json, excel, csv)')
+    parser.add_argument('--weekly-signals', action='store_true', help='Emit one-week trade recommendations only')
     
     args = parser.parse_args()
     
@@ -231,8 +237,29 @@ def main():
     
     # Run analysis
     try:
-        results = system.run_analysis(tickers)
-        system.display_results(results)
+        if args.weekly_signals:
+            # Run weekly signal generation only
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            data = loop.run_until_complete(system.fetch_data(tickers))
+            loop.close()
+            
+            signals = system.signal_generator.generate_signals(data)
+            if not signals.empty:
+                print("\n" + "="*60)
+                print("WEEKLY TRADING SIGNALS")
+                print("="*60)
+                print(signals.to_string(index=False))
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                utils.save_results({'weekly_signals': signals.to_dict('records')},
+                                   Path('results') / f"signals_{timestamp}.json")
+            else:
+                print("No signals generated today.")
+        else:
+            # Run full analysis
+            results = system.run_analysis(tickers)
+            system.display_results(results)
     except Exception as e:
         logger.error(f"Analysis failed: {e}", exc_info=True)
         sys.exit(1)
